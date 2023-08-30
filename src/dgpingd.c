@@ -40,7 +40,7 @@ bindon(int s, struct sockaddr_in *sin)
 }
 
 static int
-recvecho(int s, uint16_t *seq, struct sockaddr_in *sin, socklen_t sinsz, int quiet)
+recvecho(int s, uint16_t *seq, struct sockaddr_in *sin, socklen_t sinsz, int quiet, int no_checksum)
 {
 	char buf[DEFAULT_PAYLOAD + MAX_EXTRA_PAYLOAD];
 	ssize_t r;
@@ -52,7 +52,7 @@ recvecho(int s, uint16_t *seq, struct sockaddr_in *sin, socklen_t sinsz, int qui
 		return -1;
 	}
 
-	if (1 != validate(buf, seq)) {
+	if (1 != validate(buf, seq, no_checksum)) {
 		return -1;
 	}
 
@@ -63,15 +63,19 @@ recvecho(int s, uint16_t *seq, struct sockaddr_in *sin, socklen_t sinsz, int qui
 }
 
 static void
-sendecho(int s, uint16_t seq, struct sockaddr_in *sin, int extra_payload)
+sendecho(int s, uint16_t seq, struct sockaddr_in *sin, int extra_payload, int no_checksum)
 {
 	const char *buf;
 
-	buf = mkping(seq, extra_payload);
+	buf = mkping(seq, extra_payload, no_checksum);
 
 	if (-1 == sendto(s, buf, strlen(buf) + 1, 0, (void *) sin, sizeof *sin)) {
 		perror("sendto");
 	}
+}
+static void
+usage(void) {
+	fprintf(stderr, "usage: dgpingd <address> <port> [ -q ] [ -f ]\n");
 }
 
 int
@@ -80,16 +84,45 @@ main(int argc, char *argv[])
 	int s;
 	struct sockaddr_in sin;
 	int quiet;
+	int no_checksum;
 	int payload_len;
 
-	if (3 != argc && 4 != argc) {
-		fprintf(stderr, "usage: dgpingd <address> <port> [quiet]\n");
+	/* defaults */
+	quiet = 0;
+	no_checksum = 0;
+
+	/* Handle CLI options */
+	{
+		int c;
+
+		while ((c = getopt(argc, argv, "qf")) != -1) {
+			switch (c) {
+			case 'q':
+				quiet = 1;
+				break;
+
+			case 'f':
+				no_checksum = 1;
+				break;
+
+			case '?':
+			case 'h':
+			default:
+				usage();
+				return EXIT_FAILURE;
+			}
+		}
+		argc -= optind;
+		argv += optind;
+	}
+
+	if (2 != argc) {
+		usage();
 		return EXIT_FAILURE;
 	}
 
-	quiet = argc == 4;
 
-	s = getaddr(argv[1], argv[2], &sin, SOCK_DGRAM, IPPROTO_UDP);
+	s = getaddr(argv[0], argv[1], &sin, SOCK_DGRAM, IPPROTO_UDP);
 	if (-1 == s) {
 		return EXIT_FAILURE;
 	}
@@ -107,13 +140,13 @@ main(int argc, char *argv[])
 	}
 
 	/* TODO find "UDP" automatically */
-	printf("listening on %s:%s %s\n", argv[1], argv[2], "UDP/IP");
+	printf("listening on %s:%s %s\n", argv[0], argv[1], "UDP/IP");
 
 	for (;;) {
 		uint16_t seq;
 
-		if ((payload_len = recvecho(s, &seq, &sin, sizeof sin, quiet)) >= 0) {
-			sendecho(s, seq, &sin, payload_len);
+		if ((payload_len = recvecho(s, &seq, &sin, sizeof sin, quiet, no_checksum)) >= 0) {
+			sendecho(s, seq, &sin, payload_len, no_checksum);
 		}
 	}
 

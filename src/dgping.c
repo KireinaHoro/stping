@@ -181,12 +181,12 @@ xitimerfix(struct timeval *tv)
 }
 
 static void
-sendecho(int s, struct pending **p, uint16_t seq, int extra_payload)
+sendecho(int s, struct pending **p, uint16_t seq, int extra_payload, int no_checksum)
 {
 	const char *buf;
 	struct pending *new;
 
-	buf = mkping(seq, extra_payload);
+	buf = mkping(seq, extra_payload, no_checksum);
 
 	while (-1 == send(s, buf, strlen(buf) + 1, 0)) {
 		switch (errno) {
@@ -263,7 +263,7 @@ removepending(struct pending **p)
 }
 
 static void
-recvecho(int s, struct pending **p, int quiet)
+recvecho(int s, struct pending **p, int quiet, int no_checksum)
 {
 	char buf[DEFAULT_PAYLOAD + MAX_EXTRA_PAYLOAD];
    	struct sockaddr_in sin;
@@ -286,7 +286,7 @@ recvecho(int s, struct pending **p, int quiet)
 
 	stat_recieved++;
 
-	if (1 != validate(buf, &seq)) {
+	if (1 != validate(buf, &seq, no_checksum)) {
 		stat_ignored++;
 		return;
 	}
@@ -410,7 +410,7 @@ printstats(FILE *f, int multiline)
 
 static void
 usage(void) {
-	fprintf(stderr, "usage: dgping [ -c <count> ] [ -s extra_payload ] [ -i interval ] [ -q ] "
+	fprintf(stderr, "usage: dgping [ -c <count> ] [ -s extra_payload ] [ -i interval ] [ -q ] [ -f ] "
 		"<address> <port>\n");
 }
 
@@ -426,6 +426,7 @@ main(int argc, char **argv)
 	sigset_t set;
 	double interval;
 	int quiet;
+	int no_checksum;
 	int extra_payload;
 
 	sigemptyset(&set);
@@ -443,13 +444,14 @@ main(int argc, char **argv)
 	interval = INTERVAL;
 	quiet = 0;
 	extra_payload = 0;
+	no_checksum = 0;
 
 	/* Handle CLI options */
 	count = 0;
 	{
 		int c;
 
-		while ((c = getopt(argc, argv, "hqc:s:i:")) != -1) {
+		while ((c = getopt(argc, argv, "hqfc:s:i:")) != -1) {
 			switch (c) {
 			case 'c':
 				count = atoi(optarg);
@@ -469,6 +471,10 @@ main(int argc, char **argv)
 
 			case 'q':
 				quiet = 1;
+				break;
+
+			case 'f':
+				no_checksum = 1;
 				break;
 
 			case 's':
@@ -532,7 +538,7 @@ main(int argc, char **argv)
 		int r;
 		struct timeval t;
 
-		sendecho(s, &p, seq, extra_payload);
+		sendecho(s, &p, seq, extra_payload, no_checksum);
 
 		/*
 		 * This loop is responsible for two things: delaying for 'interval',
@@ -572,7 +578,7 @@ main(int argc, char **argv)
 			default:
 				/* handle activity */
 				if (FD_ISSET(s, &rfds)) {
-					recvecho(s, &p, quiet);
+					recvecho(s, &p, quiet, no_checksum);
 				}
 
 				if (-1 == gettimeofday(&after, NULL)) {
@@ -628,7 +634,7 @@ main(int argc, char **argv)
 	}
 
 	while (!shouldexit && p != NULL) {
-		recvecho(s, &p, quiet);
+		recvecho(s, &p, quiet, no_checksum);
 
 		culltimeouts(&p);
 	}

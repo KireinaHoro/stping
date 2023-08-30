@@ -228,7 +228,7 @@ sendecho(int s, struct pending **p, uint16_t seq)
 	const char *buf;
 	size_t len;
 
-	buf = mkping(seq, 0);
+	buf = mkping(seq, 0, 0);
 	len = strlen(buf);
 
 	while (len > 0) {
@@ -326,7 +326,7 @@ recvecho(int s, struct pending **p, struct sockaddr_in *sin)
 
 	stat_recieved++;
 
-	if (1 != validate(buf, &seq)) {
+	if (1 != validate(buf, &seq, 0)) {
 		stat_ignored++;
 		return 0;
 	}

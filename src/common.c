@@ -91,7 +91,7 @@ const char extra_payload_str[] = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKL
 
 /* See common.h */
 const char *
-mkping(uint16_t seq, int extra_payload)
+mkping(uint16_t seq, int extra_payload, int no_checksum)
 {
 	static char buf[DEFAULT_PAYLOAD + MAX_EXTRA_PAYLOAD];
 	time_t t;
@@ -114,14 +114,18 @@ mkping(uint16_t seq, int extra_payload)
 	 * TODO mention fletcher needs a few bytes for entropy?
 	 */
 	/* TODO: strftime %z */
-	ckvsprintf(buf, " %04X %.24s\n%.*s", seq, ctime(&t), extra_payload, extra_payload_str);
+	if (no_checksum) {
+		sprintf(buf, "00 %04X %.24s\n%.*s", seq, ctime(&t), extra_payload, extra_payload_str);
+	} else {
+		ckvsprintf(buf, " %04X %.24s\n%.*s", seq, ctime(&t), extra_payload, extra_payload_str);
+	}
 
 	return buf;
 }
 
 /* See common.h */
 int
-validate(const char *in, uint16_t *seq)
+validate(const char *in, uint16_t *seq, int no_checksum)
 {
 	unsigned int tck;
 	unsigned int n;
@@ -132,10 +136,12 @@ validate(const char *in, uint16_t *seq)
 		return 0;
 	}
 
-	ock = fletcher8(in + 2);
-	if (ock != tck) {
-		fprintf(stderr, "disregarding: checksum mismatch: %X != %X\n", ock, tck);
-		return 0;
+	if (!no_checksum) {
+		ock = fletcher8(in + 2);
+		if (ock != tck) {
+			fprintf(stderr, "disregarding: checksum mismatch: %X != %X\n", ock, tck);
+			return 0;
+		}
 	}
 
 	*seq = n;

@@ -202,7 +202,7 @@ recvecho(struct connection **head, int s, uint16_t *seq, struct sockaddr_in *sin
 
 	conn->buf[sizeof conn->buf - 1] = '\0';
 
-	if (1 != validate(conn->buf, seq)) {
+	if (1 != validate(conn->buf, seq, 0)) {
 		return 0;
 	}
 
@@ -218,7 +218,7 @@ sendecho(int s, uint16_t seq)
 	const char *buf;
 	size_t len;
 
-	buf = mkping(seq, 0);
+	buf = mkping(seq, 0, 0);
 	len = strlen(buf);
 
 	while (len > 0) {

@@ -19,15 +19,19 @@
  *
  * In case extra_payload != 0, that number of bytes are filled with a
  * sweep of ASCII printable bytes.
+ *
+ * Checksum generation is disabled if no_checksum == 1.
  */
 const char *
-mkping(uint16_t seq, int extra_payload);
+mkping(uint16_t seq, int extra_payload, int no_checksum);
 
 /*
- * Validate an expected checksum. Return true on success.
+ * Validate an expected frame format. Return true on success.
+ *
+ * Checksum validation is disabled if no_checksum == 1.
  */
 int
-validate(const char *in, uint16_t *seq);
+validate(const char *in, uint16_t *seq, int no_checksum);
 
 /*
  * Parse out strings giving a PF port and address to the given sockaddr struct;
