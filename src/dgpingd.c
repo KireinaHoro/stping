@@ -40,7 +40,7 @@ bindon(int s, struct sockaddr_in *sin)
 }
 
 static int
-recvecho(int s, uint16_t *seq, struct sockaddr_in *sin, socklen_t sinsz)
+recvecho(int s, uint16_t *seq, struct sockaddr_in *sin, socklen_t sinsz, int quiet)
 {
 	char buf[1024];
 	ssize_t r;
@@ -55,7 +55,8 @@ recvecho(int s, uint16_t *seq, struct sockaddr_in *sin, socklen_t sinsz)
 		return 0;
 	}
 
-	printf("%d bytes from %s seq=%d\n", (int) strlen(buf) + 1, inet_ntoa(sin->sin_addr), *seq);
+	if (!quiet)
+		printf("%d bytes from %s seq=%d\n", (int) strlen(buf) + 1, inet_ntoa(sin->sin_addr), *seq);
 	return 1;
 }
 
@@ -76,11 +77,14 @@ main(int argc, char *argv[])
 {
 	int s;
 	struct sockaddr_in sin;
+	int quiet;
 
-	if (3 != argc) {
-		fprintf(stderr, "usage: dgpingd <address> <port>\n");
+	if (3 != argc && 4 != argc) {
+		fprintf(stderr, "usage: dgpingd <address> <port> [quiet]\n");
 		return EXIT_FAILURE;
 	}
+
+	quiet = argc == 4;
 
 	s = getaddr(argv[1], argv[2], &sin, SOCK_DGRAM, IPPROTO_UDP);
 	if (-1 == s) {
@@ -105,7 +109,7 @@ main(int argc, char *argv[])
 	for (;;) {
 		uint16_t seq;
 
-		if (1 == recvecho(s, &seq, &sin, sizeof sin)) {
+		if (1 == recvecho(s, &seq, &sin, sizeof sin, quiet)) {
 			sendecho(s, seq, &sin);
 		}
 	}

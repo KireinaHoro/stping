@@ -263,7 +263,7 @@ removepending(struct pending **p)
 }
 
 static void
-recvecho(int s, struct pending **p)
+recvecho(int s, struct pending **p, int quiet)
 {
 	char buf[3 + 5 + 24 + 2];
    	struct sockaddr_in sin;
@@ -312,8 +312,10 @@ recvecho(int s, struct pending **p)
 		d = tvtoms(&dtv);
 		assert(d >= 0);
 
-		printf("%d bytes from %s seq=%d time=%.3f ms\n",
-			(int) strlen(buf) + 1, inet_ntoa(sin.sin_addr), seq, d);
+		if (!quiet) {
+			printf("%d bytes from %s seq=%d time=%.3f ms\n",
+				(int) strlen(buf) + 1, inet_ntoa(sin.sin_addr), seq, d);
+		}
 
 		stat_timesum += d;
 		stat_timesqr += pow(d, 2);
@@ -408,7 +410,7 @@ printstats(FILE *f, int multiline)
 
 static void
 usage(void) {
-	fprintf(stderr, "usage: dgping [ -c <count> ] [ -i interval ] "
+	fprintf(stderr, "usage: dgping [ -c <count> ] [ -i interval ] [ -q ] "
 		"<address> <port>\n");
 }
 
@@ -423,6 +425,7 @@ main(int argc, char **argv)
 	struct sigaction sigact;
 	sigset_t set;
 	double interval;
+	int quiet;
 
 	sigemptyset(&set);
 	(void) sigaddset(&set, SIGINT);
@@ -437,13 +440,14 @@ main(int argc, char **argv)
 
 	/* defaults */
 	interval = INTERVAL;
+	quiet = 0;
 
 	/* Handle CLI options */
 	count = 0;
 	{
 		int c;
 
-		while ((c = getopt(argc, argv, "hc:i:")) != -1) {
+		while ((c = getopt(argc, argv, "hqc:i:")) != -1) {
 			switch (c) {
 			case 'c':
 				count = atoi(optarg);
@@ -459,6 +463,10 @@ main(int argc, char **argv)
 					fprintf(stderr, "Invalid ping interval\n");
 					return EXIT_FAILURE;
 				}
+				break;
+
+			case 'q':
+				quiet = 1;
 				break;
 
 			case '?':
@@ -554,7 +562,7 @@ main(int argc, char **argv)
 			default:
 				/* handle activity */
 				if (FD_ISSET(s, &rfds)) {
-					recvecho(s, &p);
+					recvecho(s, &p, quiet);
 				}
 
 				if (-1 == gettimeofday(&after, NULL)) {
@@ -610,7 +618,7 @@ main(int argc, char **argv)
 	}
 
 	while (!shouldexit && p != NULL) {
-		recvecho(s, &p);
+		recvecho(s, &p, quiet);
 
 		culltimeouts(&p);
 	}
