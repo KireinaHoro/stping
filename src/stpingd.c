@@ -218,7 +218,7 @@ sendecho(int s, uint16_t seq)
 	const char *buf;
 	size_t len;
 
-	buf = mkping(seq);
+	buf = mkping(seq, 0);
 	len = strlen(buf);
 
 	while (len > 0) {

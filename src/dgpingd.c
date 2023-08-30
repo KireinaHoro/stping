@@ -42,30 +42,32 @@ bindon(int s, struct sockaddr_in *sin)
 static int
 recvecho(int s, uint16_t *seq, struct sockaddr_in *sin, socklen_t sinsz, int quiet)
 {
-	char buf[1024];
+	char buf[DEFAULT_PAYLOAD + MAX_EXTRA_PAYLOAD];
 	ssize_t r;
+	int payload_len;
 
 	r = recvfrom(s, buf, sizeof buf, 0, (void *) sin, &sinsz);
 	if (-1 == r) {
 		perror("recvfrom");
-		return 0;
+		return -1;
 	}
 
 	if (1 != validate(buf, seq)) {
-		return 0;
+		return -1;
 	}
 
+	payload_len = strlen(buf) + 1;
 	if (!quiet)
-		printf("%d bytes from %s seq=%d\n", (int) strlen(buf) + 1, inet_ntoa(sin->sin_addr), *seq);
-	return 1;
+		printf("%d bytes from %s seq=%d\n", payload_len, inet_ntoa(sin->sin_addr), *seq);
+	return payload_len - DEFAULT_PAYLOAD;
 }
 
 static void
-sendecho(int s, uint16_t seq, struct sockaddr_in *sin)
+sendecho(int s, uint16_t seq, struct sockaddr_in *sin, int extra_payload)
 {
 	const char *buf;
 
-	buf = mkping(seq);
+	buf = mkping(seq, extra_payload);
 
 	if (-1 == sendto(s, buf, strlen(buf) + 1, 0, (void *) sin, sizeof *sin)) {
 		perror("sendto");
@@ -78,6 +80,7 @@ main(int argc, char *argv[])
 	int s;
 	struct sockaddr_in sin;
 	int quiet;
+	int payload_len;
 
 	if (3 != argc && 4 != argc) {
 		fprintf(stderr, "usage: dgpingd <address> <port> [quiet]\n");
@@ -109,8 +112,8 @@ main(int argc, char *argv[])
 	for (;;) {
 		uint16_t seq;
 
-		if (1 == recvecho(s, &seq, &sin, sizeof sin, quiet)) {
-			sendecho(s, seq, &sin);
+		if ((payload_len = recvecho(s, &seq, &sin, sizeof sin, quiet)) >= 0) {
+			sendecho(s, seq, &sin, payload_len);
 		}
 	}
 

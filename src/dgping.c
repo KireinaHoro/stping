@@ -181,12 +181,12 @@ xitimerfix(struct timeval *tv)
 }
 
 static void
-sendecho(int s, struct pending **p, uint16_t seq)
+sendecho(int s, struct pending **p, uint16_t seq, int extra_payload)
 {
 	const char *buf;
 	struct pending *new;
 
-	buf = mkping(seq);
+	buf = mkping(seq, extra_payload);
 
 	while (-1 == send(s, buf, strlen(buf) + 1, 0)) {
 		switch (errno) {
@@ -265,7 +265,7 @@ removepending(struct pending **p)
 static void
 recvecho(int s, struct pending **p, int quiet)
 {
-	char buf[3 + 5 + 24 + 2];
+	char buf[DEFAULT_PAYLOAD + MAX_EXTRA_PAYLOAD];
    	struct sockaddr_in sin;
 	struct pending **curr;
 	socklen_t sinsz;
@@ -410,7 +410,7 @@ printstats(FILE *f, int multiline)
 
 static void
 usage(void) {
-	fprintf(stderr, "usage: dgping [ -c <count> ] [ -i interval ] [ -q ] "
+	fprintf(stderr, "usage: dgping [ -c <count> ] [ -s extra_payload ] [ -i interval ] [ -q ] "
 		"<address> <port>\n");
 }
 
@@ -426,6 +426,7 @@ main(int argc, char **argv)
 	sigset_t set;
 	double interval;
 	int quiet;
+	int extra_payload;
 
 	sigemptyset(&set);
 	(void) sigaddset(&set, SIGINT);
@@ -441,13 +442,14 @@ main(int argc, char **argv)
 	/* defaults */
 	interval = INTERVAL;
 	quiet = 0;
+	extra_payload = 0;
 
 	/* Handle CLI options */
 	count = 0;
 	{
 		int c;
 
-		while ((c = getopt(argc, argv, "hqc:i:")) != -1) {
+		while ((c = getopt(argc, argv, "hqc:s:i:")) != -1) {
 			switch (c) {
 			case 'c':
 				count = atoi(optarg);
@@ -467,6 +469,14 @@ main(int argc, char **argv)
 
 			case 'q':
 				quiet = 1;
+				break;
+
+			case 's':
+				extra_payload = atoi(optarg);
+				if (extra_payload < 0) {
+					fprintf(stderr, "Invalid extra payload length\n");
+					return EXIT_FAILURE;
+				};
 				break;
 
 			case '?':
@@ -522,7 +532,7 @@ main(int argc, char **argv)
 		int r;
 		struct timeval t;
 
-		sendecho(s, &p, seq);
+		sendecho(s, &p, seq, extra_payload);
 
 		/*
 		 * This loop is responsible for two things: delaying for 'interval',

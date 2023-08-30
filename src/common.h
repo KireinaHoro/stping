@@ -8,11 +8,20 @@
 #include <stdint.h>
 
 /*
+ * Maximum length of the extra payload (to mkping).
+ */
+#define DEFAULT_PAYLOAD (3 + 5 + 24 + 2)
+#define MAX_EXTRA_PAYLOAD 1400
+
+/*
  * Format a string to the given sequence number. A pointer to a static
  * string is returned.
+ *
+ * In case extra_payload != 0, that number of bytes are filled with a
+ * sweep of ASCII printable bytes.
  */
 const char *
-mkping(uint16_t seq);
+mkping(uint16_t seq, int extra_payload);
 
 /*
  * Validate an expected checksum. Return true on success.
